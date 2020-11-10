@@ -2,6 +2,8 @@
 #include <iostream>
 using namespace std;
 
+#define MAX_VECTOR_SIZE 1000		//максимальный размер вектора
+
 #define FACTOR 2	//множитель
 #define FACTOR_LOW 3	//коэффициент, который нужен чтобы понять, насколько большое значение capacity относительно size 
 
@@ -11,7 +13,7 @@ class Vector
 protected:
 	ValType* data;
 	size_t size;	//сколько элементов лежит в векторе с точки зрения пользователя
-	size_t	capacity;	//реальльный размер вектора, вместе с запасной вместимостью
+	size_t capacity;	//реальльный размер вектора, вместе с запасной вместимостью
 public:
 	Vector();					//конструктор по умолчанию
 	Vector(int passed_size);	//конструктор с параметром
@@ -63,7 +65,7 @@ Vector<ValType>::Vector()
 template <class ValType>	//конструктор с параметром
 Vector<ValType>::Vector(int passed_size)
 {
-	if (passed_size > 0)
+	if (passed_size > 0 && passed_size<=MAX_VECTOR_SIZE)
 	{
 		data = new ValType[passed_size * FACTOR];
 		size = passed_size;
@@ -97,7 +99,7 @@ void Vector<ValType>::push_back(ValType elem)
 {
 	resize(size + 1);		//размерность вектора стала size+1, самая правая ячейка - data[(size+1)-1]. Т.к. стало size=size+1, то самая правая ячейка - это data[size-1]
 	data[size - 1] = elem;
-	/* рабочее!
+	/* рабочее! но без проверки на size+1<=MAX_VECTOR_SIZE
 	if (size < capacity)	//если есть ещё место в конце нашего вектора, то дописываем туда
 	{
 		data[size] = elem;		//т.к. до сих пор заняты места от нуля до size-1 - всего ровно size штук.
@@ -136,7 +138,7 @@ void Vector<ValType>::push_front(ValType elem)	//добавляет элемен
 	for (int i = size - 2; i >= 0; i--)
 		data[i + 1] = data[i];
 	data[0] = elem;
-	/*	рабочее!
+	/*	рабочее!	но без проверки на size+1<=MAX_VECTOR_SIZE
 	if (size < capacity)	//если есть ещё место в конце нашего вектора, то дописываем туда
 	{
 		for(int i=size-1; i>=0; i--)
@@ -178,7 +180,7 @@ void Vector<ValType>::pop_front()	//удаляет первый элемент �
 template <class ValType>
 void Vector<ValType>::resize(int n)	//Оставляет в векторе n первых элементов. Если вектор содержит больше элементов, то его размер усекается до n элементов
 {									//Если размер вектора меньше n, то добавляются недостающие элементы и инициализируются значением по умолчанию (нулём)
-	if (n > 0)
+	if (n > 0 && n <= MAX_VECTOR_SIZE)
 	{
 		if (n <= size)	//ничего не добавляем по памяти, просто ограничиваем выводимый размер. Значение capacity сохраняется
 			size = n;				//сюда free_up_space не вставляем, т.к. само по себе урезание размера вектора ни о чём не говорит.
@@ -197,7 +199,7 @@ void Vector<ValType>::resize(int n)	//Оставляет в векторе n п�
 					tmp[i] = data[i];
 				for (int i = size; i < n; i++)
 					tmp[i] = 0;
-				if (data != nullptr) 
+				if (data != nullptr)
 					delete[] data;
 				data = tmp;
 				size = n;
@@ -205,7 +207,8 @@ void Vector<ValType>::resize(int n)	//Оставляет в векторе n п�
 			}
 		}
 	}
-	else throw "Incorrect Vector's Size";
+	else if (n > MAX_VECTOR_SIZE) throw "Stack Overflow";
+		else throw "Negative Vector's Size";
 }
 
 template <class ValType>
@@ -267,7 +270,10 @@ void Vector<ValType>::erase(int index)	//удаляет элемент, на к�
 	}
 	else throw "Incorrect Vector's Index";
 }
-
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------*/
 template <class ValType = int>
 class Stack : public Vector<ValType>
 {
@@ -297,10 +303,10 @@ public:
 		return flag;
 
 	}
-	bool full() 	//возвращает true, если стек полон
+	bool full() 	//возвращает true, если стек полон, т.е. если size = MAX_VECTOR_SIZE
 	{
 		bool flag = false;
-		if (size == capacity)
+		if (size == MAX_VECTOR_SIZE)
 			flag = true;
 		return flag;
 	}
@@ -308,7 +314,128 @@ public:
 
 private:	//реализацию функций, которые есть в векторе, но не должно быть в стеке, помещаем в private без инициализации, к ним нельзя будет обратиться
 	void push_front(ValType elem) {}
-	void pop_front(ValType elem) {}
+	void pop_front() {}
+	ValType& operator[] (int index) {}
+	ValType operator[] (int index) const {}
+	void insert(ValType elem, int index) {}
+	void erase(int index) {}
+};
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------------------------------------------*/
+template <class ValType = int>
+class Queue : public Vector<ValType>
+{
+public:
+	int start;		//указывает на начало очереди
+	int end;		//указывает на конец очереди. Нужно для циклического буфера
+
+	void resize(int n)	//увеличение размера, когда достигнут максимум из элементов очереди на базе вектора
+	{
+		if (n > capacity)
+		{
+			ValType* tmp = new ValType[n * FACTOR];
+			for (int i = start; i < capacity; i++)
+				tmp[i - start] = data[i];
+			if (start>end)
+				for (int i = 0; i <= end; i++)
+					tmp[i + (size - start)] = data[i];
+			if (data != nullptr)
+				delete[] data;
+			data = tmp;
+			size = n;
+			capacity = n * FACTOR;
+		}
+	}
+
+public:
+	Queue() : Vector() { start = 0; end = 0; }
+	Queue(int passed_value) : Vector(passed_value) { start = 0; end = passed_value - 1; }
+	Queue(const Queue& v) : Vector(v) { start = v.start; end = v.end; }
+	~Queue() {}
+
+	friend ostream& operator<<(ostream& out, const Queue& q)
+	{
+		if (q.data != nullptr)
+			if (q.start <= q.end)
+			{
+				for (int i = 0; i < q.start; i++)
+					out << "free" << ' ';
+				for (int i = q.start; i <= q.end; i++)
+					out << q.data[i] << ' ';
+				for (int i = q.end + 1; i < q.capacity; i++)
+					out << "free" << ' ';
+			}
+			else //если satrt>end, то есть если происходило зацикливание
+			{
+				for (int i = 0; i <= q.end; i++)
+					out << q.data[i] << ' ';
+				for (int i = q.end + 1; i < q.start; i++)
+					out << "free" << ' ';
+				for (int i = q.start; i < q.capacity; i++)
+					out << q.data[i] <<' ';
+			}
+		return out;
+	}
+
+	ValType front()		//возвращает значение первого элемента очереди
+	{
+		if (size > 0)
+			return data[start];
+		else throw "Queue's Size Must Be Positive";		//если size==0
+	}
+
+	ValType back()		//возвращает значение последнего элемента очереди
+	{
+		if (size > 0)
+			return data[end];
+		else throw "Queue's Size Must Be Positive"
+	}
+
+	void push(ValType elem)	//помещает в конец очереди значение elem
+	{
+		if (size + 1 <= capacity)
+			if (end < capacity - 1)
+			{
+				Vector<ValType>::resize(size + 1);		//НИЧЕГО НЕ ДЕЛАЕТ ПОФИКСИТЬ!
+				data[size] = elem;
+				end++;
+			}
+			else		//если back=capacity-1, т.е. крайнее верхнее место очереди data[capacity-1] уже занято, и нужно заполнять очередь циклически снизу 
+			{
+				data[0] = elem;
+				size++;
+				end = 0;
+			}
+		else		//если для следующего элемента у нас уже нет места в очереди 
+		{
+			resize(size + 1);
+			data[size - 1] = elem;	//или, что то же, data[back+1]=elem;
+			end++;
+		}
+	}
+
+	void pop()	//удаляет значение из начала очереди
+	{
+		if (size > 1)
+		{
+			if (start != (capacity - 1))	//если start лежит ниже самого верхнего значения индекса
+				start++;
+			else start = 0;
+			size--;
+		}
+		else
+		{
+			size = 0;
+			data = nullptr;
+			start = 0;
+			end = 0;
+		}
+	}
+private:
+	void push_front(ValType elem) {}
+	void pop_back() {}
 	ValType& operator[] (int index) {}
 	ValType operator[] (int index) const {}
 	void insert(ValType elem, int index) {}
