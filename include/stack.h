@@ -301,7 +301,6 @@ public:
 		if (size == 0)
 			flag = true;
 		return flag;
-
 	}
 	bool full() 	//возвращает true, если стек полон, т.е. если size = MAX_VECTOR_SIZE
 	{
@@ -327,31 +326,58 @@ private:	//реализацию функций, которые есть в ве�
 template <class ValType = int>
 class Queue : public Vector<ValType>
 {
-public:
+private:
 	int start;		//указывает на начало очереди
 	int end;		//указывает на конец очереди. Нужно для циклического буфера
 
+	void repackaging(int param)
+	{
+		ValType* tmp = new ValType[param * FACTOR];
+		int count = size;
+		for (int i = start; i < capacity && count>0; i++, count--)		//условие с count нужно для перепаковки, когда много свободного места. В этом случае i до capacity может и не дойти. Там лежит мусор! 
+			tmp[i - start] = data[i];									//Когда, например, очередь вида free 5 7 free free free free free. size=2, start=1. Без условия на count получаем выход за пределы диапозона
+		if (start > end)
+			for (int i = 0; i <= end && count>0; i++,count--)
+				tmp[i + (size - start)] = data[i];
+		if (data != nullptr)
+			delete[] data;
+		data = tmp;
+		int raznitsa = param - size;
+		size = param;
+		capacity = param * FACTOR;
+		start = 0;
+		end = size - raznitsa - 1;		//т.к. новый элемент ещё не добавляли, только ещё вызвали ресайз. Раньше последний элемент был в ячейке size-1, а после увеличения size до n стал лежать в ячейке size-raznitsa-1
+	}
+
 	void resize(int n)	//увеличение размера, когда достигнут максимум из элементов очереди на базе вектора
 	{
-		if (n > capacity)
+		if (n > 0 && n <= MAX_VECTOR_SIZE)
 		{
-			ValType* tmp = new ValType[n * FACTOR];
-			for (int i = start; i < capacity; i++)
-				tmp[i - start] = data[i];
-			if (start>end)
-				for (int i = 0; i <= end; i++)
-					tmp[i + (size - start)] = data[i];
-			if (data != nullptr)
-				delete[] data;
-			data = tmp;
-			size = n;
-			capacity = n * FACTOR;
+			if (n <= size)	//ничего не добавляем по памяти, просто ограничиваем выводимый размер. Значение capacity сохраняется
+				size = n;				//сюда free_up_space не вставляем, т.к. само по себе урезание размера вектора ни о чём не говорит.
+			else						//Возможно, далее пользователь будет заново вводить много чисел. Если же будет удалять, сработает проверка в функциях удаления
+			{
+				if (n <= capacity)	//т.е. если size < n <= capacity. Значение capacity сохраняется
+				{
+					for (int i = size; i < n; i++)
+					{
+						if (start + i < capacity) data[start + i] = 0;
+						else data[start + i - capacity] = 0;
+					}
+					size = n;	//значения start и end сохраняются
+				}
+				else	//т.е. если  n > capacity
+				{
+					repackaging(n);
+				}
+			}
 		}
+		else if (n > MAX_VECTOR_SIZE) throw "Stack Overflow";
 	}
 
 public:
 	Queue() : Vector() { start = 0; end = 0; }
-	Queue(int passed_value) : Vector(passed_value) { start = 0; end = passed_value - 1; }
+	Queue(int passed_value) : Vector(passed_value) { start = 0; end = passed_value - 1; }			//если написать end=passed_value - 1, то в очереди будет вначале passed_value - 1 нулей. Нам это не нужно, наша задача - просто выделить память под очередь
 	Queue(const Queue& v) : Vector(v) { start = v.start; end = v.end; }
 	~Queue() {}
 
@@ -390,28 +416,20 @@ public:
 	{
 		if (size > 0)
 			return data[end];
-		else throw "Queue's Size Must Be Positive"
+		else throw "Queue's Size Must Be Positive";
 	}
 
 	void push(ValType elem)	//помещает в конец очереди значение elem
 	{
-		if (size + 1 <= capacity)
-			if (end < capacity - 1)
-			{
-				Vector<ValType>::resize(size + 1);		//НИЧЕГО НЕ ДЕЛАЕТ ПОФИКСИТЬ!
-				data[size] = elem;
-				end++;
-			}
-			else		//если back=capacity-1, т.е. крайнее верхнее место очереди data[capacity-1] уже занято, и нужно заполнять очередь циклически снизу 
-			{
-				data[0] = elem;
-				size++;
-				end = 0;
-			}
-		else		//если для следующего элемента у нас уже нет места в очереди 
+		resize(size + 1);		//size увеличится уже в resize, а дальше добавим элемент, и это станет правдой
+		if (end == (capacity-1))
 		{
-			resize(size + 1);
-			data[size - 1] = elem;	//или, что то же, data[back+1]=elem;
+			data[0] = elem;
+			end = 0;
+		}
+		else		//если end не лежит в последней ячейке и не нужно вызывать зацикливания 
+		{
+			data[end + 1] = elem;
 			end++;
 		}
 	}
@@ -424,6 +442,7 @@ public:
 				start++;
 			else start = 0;
 			size--;
+			free_up_space();		//проверка на чрезмерное количество свободного места
 		}
 		else
 		{
@@ -433,6 +452,34 @@ public:
 			end = 0;
 		}
 	}
+	void free_up_space()	//Если capacity в процессе работы стало намного больше, чем size (в три раза), уменьшает значение capacity
+	{
+		if (capacity >= FACTOR_LOW * size)
+		{
+			repackaging(size);		//будет вызываться перепаковка, то есть после этого метода элементы будут иметь начало очереди в нуле (start=0)
+		}
+	}
+	bool empty() 	//возвращает true, если очередь пуста
+	{
+		/*bool flag = false;
+		if (size == 0)
+			flag = true;
+		return flag;*/
+		return (size == 0);
+	}
+	bool full() 	//возвращает true, если очередь заполнена, т.е. если size = MAX_VECTOR_SIZE
+	{
+		/*bool flag = false;
+		if (size == MAX_VECTOR_SIZE)
+			flag = true;
+		return flag;*/
+		return (size == MAX_VECTOR_SIZE);
+	}
+
+	int GetStart() { return start; }
+	int GetEnd() { return end; }
+	//узнать size и capacity очереди можно из соответствующих Get функций вектора
+
 private:
 	void push_front(ValType elem) {}
 	void pop_back() {}
