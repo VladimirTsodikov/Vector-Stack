@@ -45,13 +45,12 @@ TEST(Stack, can_do_pop_correctly)
 
 TEST(Stack, can_do_full_correctly)
 {
-	Stack<> s;		//size=capacity=0
-	s.push(-44);	//size=1, capacity=2
-	s.push(7);		//size=2, capacity=2
-	s.push(-13);	//size=3, capacity=6
-	s.push(1);		//size=4, capacity=6
-	s.push(9);		//size=5, capacity=6
-	s.push(-18);	//size=6, capacity=6, стек полон
+	Stack<> s(998);		//size=998, стек не полон
+	s.push(-44);		//size=999, стек не полон
+
+	EXPECT_NE(true, s.full());
+
+	s.push(7);			//size=1000, стек полон
 
 	EXPECT_EQ(true, s.full());
 }
@@ -100,4 +99,12 @@ TEST(Stack, can_rid_member_if_too_mush_free_space)	//может освобождать память, е
 	s.pop();		//стек из элеметнов 0 0				size..2 capacity..8		capacity уже больше, чем 3 * size, будем уменьшать размер памяти 
 										//должно стать 		size..2 capacity..4
 	EXPECT_EQ(4, s.GetCapacity());
+}
+
+TEST(Stack, throw_when_stack_overflow)
+{
+	Stack<> s(999);		//создаётся стек, в нём лежит 999 нулей, size=999
+	s.push(-88);		//норм, size станет равным 1000
+
+	ASSERT_ANY_THROW(s.push(95));	//не норм, size должен стать 1001, что больше, чем MAX_VECTOR_SIZE
 }
