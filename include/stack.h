@@ -12,8 +12,8 @@ class Vector
 {
 protected:
 	ValType* data;
-	size_t size;	//сколько элементов лежит в векторе с точки зрения пользователя
-	size_t capacity;	//реальльный размер вектора, вместе с запасной вместимостью
+	int size;	//сколько элементов лежит в векторе с точки зрения пользователя
+	int capacity;	//реальльный размер вектора, вместе с запасной вместимостью
 public:
 	Vector();					//конструктор по умолчанию
 	Vector(int passed_size);	//конструктор с параметром
@@ -283,9 +283,19 @@ public:
 	Stack(const Stack& v) : Vector(v) {}
 	~Stack() {}
 
+	friend ostream& operator<<(ostream& out, const Stack& v)
+	{
+		if (v.data != nullptr)
+			for (int i = v.size-1; i >= 0; i--)		//вывод значений стека будет с конца, то есть с вершины стека к основанию
+				out << v.data[i] << ' ';
+		return out;
+	}
+
 	ValType top()		//возвращает значение верхнего элемента стека
 	{
-		return data[size - 1];
+		if (size > 0)
+			return data[size - 1];
+		else cout << "Stack is empty now";
 	}
 	void push(ValType elem) //помещает на верх стека значение elem
 	{	

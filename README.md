@@ -1,3 +1,2 @@
 # Vector-Stack
-About us
-yu
+Solving two tasks using a stack and queue 
